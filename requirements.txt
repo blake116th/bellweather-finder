@@ -1,0 +1,4 @@
+fastapi[standard]
+psycopg2
+Jinja2
+python-dotenv

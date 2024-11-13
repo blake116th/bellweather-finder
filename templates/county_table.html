@@ -1,0 +1,19 @@
+<table>
+    <thead>
+        <tr>
+            <th>County</th>
+            <th>State</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for county in counties %}
+        <tr>
+            <td>
+                <a href="/county/{{county[0]}}">
+                    {{county[1]}}
+                </a></td>
+            <td>{{county[2]}}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

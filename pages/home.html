@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Bellweather County Finder</title>
+        <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+    </head>
+    <body>
+        <header>
+            <h1>Bellweather County Finder</h1>
+        </header>
+        <main>
+            <input 
+              type="text" 
+              id="search" 
+              hx-get="/counties" 
+              hx-target="#search_result" 
+              hx-trigger="keyup changed delay:50ms"
+              placeholder="Type to search..." 
+              hx-vals="js:{search_term: document.getElementById('search').value}"
+            >
+            <div id="search_result"></div>
+        </main>
+        <footer>
+        </footer>
+    </body>
+</html>
