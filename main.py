@@ -1,4 +1,6 @@
-from fastapi import FastAPI
+from fastapi import Cookie, FastAPI
+from typing import Annotated
+
 import psycopg2
 from fastapi.responses import FileResponse
 from fastapi.responses import HTMLResponse
@@ -30,15 +32,78 @@ def root():
     return FileResponse("./pages/home.html")
 
 
+@app.get("/favicon.ico")
+def favicon():
+    return FileResponse("./favicon.ico")
+
+
+@app.put("/county/{fips_code}/favorite")
+def favorite(
+    fips_code: str,
+    userId: Annotated[str | None, Cookie()] = None,  # type: ignore
+):
+    print("fips", fips_code, "userId", userId)
+
+    if userId == None:
+        return 400
+
+    cur = connection.cursor()
+
+    try:
+        # toggle row
+        cur.execute(
+            """
+      WITH ins AS (
+          INSERT INTO Highlight (visitor, county)
+          VALUES (%(visitor)s, %(county)s)
+          ON CONFLICT (visitor, county) DO NOTHING
+          RETURNING *
+      )
+      DELETE FROM Highlight
+      WHERE visitor = %(visitor)s AND county = %(county)s AND NOT EXISTS (SELECT 1 FROM ins);
+      """,
+            {"visitor": userId, "county": fips_code},
+        )
+    except:
+        connection.rollback()
+        cur.close()
+        return 500
+
+    cur.close()
+
+    connection.commit()
+
+    return HTMLResponse("favorited")
+
+
 @app.get("/counties")
 def get_counties(user_id: str | None = None, search_term: str = ""):
     cur = connection.cursor()
 
+    print(user_id)
+
     cur.execute(
-        "SELECT fips_code, name, state FROM county where name ILIKE %s;",
-        (f"%{search_term}%",),
+        """
+            SELECT 
+                c.fips_code, 
+                c.name, 
+                c.state,
+                CASE 
+                    WHEN h.visitor IS NOT NULL THEN TRUE 
+                    ELSE FALSE 
+                END AS highlighted
+            FROM 
+                County c
+            LEFT JOIN 
+                Highlight h ON c.fips_code = h.county AND h.visitor = %s
+            WHERE 
+                c.name ILIKE %s
+            ORDER BY highlighted DESC;""",
+        (user_id, f"%{search_term}%"),
     )
+
     results = cur.fetchall()
+
     cur.close()
 
     template = jinja_env.get_template("county_table.html")
@@ -53,19 +118,58 @@ class County:
     fips: str
     matching_elections: int
     total_elections: int
+    favorited: bool
+
+
+@app.put("/id/{id}")
+def put_id(id: str):
+    cur = connection.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO Visitor (uuid)
+        VALUES (%s)
+        ON CONFLICT (uuid) DO NOTHING;
+        """,
+        (id,),
+    )
+
+    cur.close()
+
+    connection.commit()
+
+    return
 
 
 @app.get("/county/{fips_code}")
-def county_page(fips_code: str):
+def county_page(
+    fips_code: str,  # --
+    userId: Annotated[str | None, Cookie()] = None,  # type: ignore
+):
+    print("cookie", userId)
     template = jinja_env.get_template("county_page.html")
 
     cur = connection.cursor()
 
     cur.execute(
-        "SELECT fips_code, name, state FROM county where fips_code = %s;", (fips_code,)
+        """SELECT 
+            c.fips_code,
+            c.name, 
+            c.state,
+            CASE 
+                WHEN h.visitor IS NOT NULL THEN TRUE 
+                ELSE FALSE 
+            END AS highlighted
+          FROM 
+            county c
+          LEFT JOIN 
+            Highlight h ON c.fips_code = h.county AND h.visitor = %s
+          WHERE fips_code = %s;
+          """,
+        (userId, fips_code),
     )
 
-    results_1: list[str] = cur.fetchall()[0]  # type: ignore (trust me bro)
+    results_1: list = cur.fetchall()[0]  # type: ignore (trust me bro)
 
     cur.execute(
         """
@@ -93,6 +197,7 @@ WHERE
         fips=results_1[0],
         name=results_1[1],
         state=results_1[2],
+        favorited=results_1[3],
         matching_elections=results_2[0],
         total_elections=results_2[1],
     )

@@ -5,6 +5,19 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Bellweather County Finder</title>
         <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+        <script>
+            let userId = document.cookie.split('; ').find(row => row.startsWith('userId=')).split('=')[1];
+
+            if (!userId) {
+                userId = crypto.randomUUID();
+                document.cookie = `userId=${userId}; path=/; SameSite=Strict; Secure`;
+
+            }
+
+            fetch(`/id/${userId}`, {
+                method: 'PUT'
+            });
+        </script>
     </head>
     <body>
         <header>
@@ -18,7 +31,7 @@
               hx-target="#search_result" 
               hx-trigger="keyup changed delay:50ms"
               placeholder="Type to search..." 
-              hx-vals="js:{search_term: document.getElementById('search').value}"
+              hx-vals="js:{search_term: document.getElementById('search').value, user_id: userId}"
             >
             <div id="search_result"></div>
         </main>
