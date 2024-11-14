@@ -138,8 +138,12 @@ class County:
     fips: str
     matching_elections: int
     total_elections: int
+    state_matching_elections: int
+    state_total_elections: int
     favorited: bool
     results: list[list]
+    state_results: list[list]
+    demographics: list[float]
 
 
 @app.put("/id/{id}")
@@ -231,13 +235,61 @@ ORDER BY e.year_num DESC;
         (fips_code,),
     )
 
+    cur4 = connection.cursor()
+    cur4.execute(
+        """
+SELECT 
+    pct_white * 100,
+    pct_black * 100,
+    pct_asian * 100,
+    pct_hisp * 100
+FROM 
+    County_Demographics
+WHERE 
+    county = %s AND census_year = 2020;
+        """,
+        (fips_code,),
+    )
+
+    cur5 = connection.cursor()
+    cur5.execute(
+        """
+SELECT 
+    sr.election AS "election year",
+    100.0 * cr.D_votes / (cr.D_votes + cr.R_votes) AS "county D",
+    100.0 * cr.R_votes / (cr.D_votes + cr.R_votes) AS "county R",
+    cr.winner AS "county winner",
+    100.0 * sr.D_votes / (sr.D_votes + sr.R_votes) AS "state D",
+    100.0 * sr.R_votes / (sr.D_votes + sr.R_votes) AS "state R",
+    sr.winner AS "state winner",
+    cr.winner = sr.winner AS "match?"
+FROM 
+    State_Result sr
+LEFT JOIN 
+    County_Result cr ON sr.election = cr.election 
+                     AND cr.county IN (SELECT fips_code FROM County WHERE state = sr.state)
+WHERE 
+    cr.county = %s
+ORDER BY 
+    sr.election DESC;
+        """,
+        (fips_code,),
+    )
+
     results_1: list = cur1.fetchall()[0]  # type: ignore (trust me bro)
     results_2: list[int] = cur2.fetchall()[0]  # type: ignore (trust me bro)
     results_3: list[list] = cur3.fetchall()  # type: ignore (trust me bro)
+    results_4: list[float] = cur4.fetchall()[0]  # type: ignore (trust me bro)
+    results_5: list[list] = cur5.fetchall()  # type: ignore (trust me bro)
 
     cur1.close()
     cur2.close()
     cur3.close()
+    cur4.close()
+    cur5.close()
+
+    state_matches = sum([result[7] for result in results_5])
+    state_total = len(results_5)
 
     county = County(
         fips=results_1[0],
@@ -247,6 +299,10 @@ ORDER BY e.year_num DESC;
         matching_elections=results_2[0],
         total_elections=results_2[1],
         results=results_3,
+        state_results=results_5,
+        state_matching_elections=state_matches,
+        state_total_elections=state_total,
+        demographics=results_4,
     )
 
     return HTMLResponse(template.render(county=county))
