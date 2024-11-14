@@ -14,7 +14,7 @@
                     {{county[1]}}
                 </a></td>
             <td>{{county[2]}}</td>
-      <td>{{ county[3] }}</td>
+      <td>{{ '✅' if county[3] else '' }}</td>
         </tr>
         {% endfor %}
     </tbody>

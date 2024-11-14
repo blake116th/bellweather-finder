@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+    table {
+        @apply w-full text-sm text-left rtl:text-right text-gray-500
+    }
+    thead {
+        @apply text-xs text-gray-700 uppercase 
+    }
+    th {
+        @apply px-6 py-3
+    }
+    tr {
+        @apply border-b border-slate-300
+    }
+    h1 {
+        @apply text-2xl;
+    }
+    h2 {
+        @apply text-xl;
+    }
+    h3 {
+        @apply text-lg;
+    }
+    a {
+        @apply text-blue-600 hover:underline;
+    }
+}

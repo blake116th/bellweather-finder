@@ -29,7 +29,12 @@ jinja_env = Environment(loader=PackageLoader("main"), autoescape=select_autoesca
 
 @app.get("/")
 def root():
-    return FileResponse("./pages/home.html")
+    return FileResponse("./templates/home.html")
+
+
+@app.get("/tailwind.css")
+def styles():
+    return FileResponse("./tailwind.css")
 
 
 @app.get("/favicon.ico")
@@ -73,7 +78,22 @@ def favorite(
 
     connection.commit()
 
-    return HTMLResponse("favorited")
+    cur = connection.cursor()
+
+    cur.execute(
+        """
+        SELECT count(*) FROM Highlight
+        WHERE visitor = %s AND county = %s;
+      """,
+        (userId, fips_code),
+    )
+
+    if cur.fetchall()[0][0] > 0:
+        cur.close()
+        return HTMLResponse("Highlighted")
+
+    cur.close()
+    return HTMLResponse("Not Highlighted")
 
 
 @app.get("/counties")
@@ -119,6 +139,7 @@ class County:
     matching_elections: int
     total_elections: int
     favorited: bool
+    results: list[list]
 
 
 @app.put("/id/{id}")
@@ -149,9 +170,8 @@ def county_page(
     print("cookie", userId)
     template = jinja_env.get_template("county_page.html")
 
-    cur = connection.cursor()
-
-    cur.execute(
+    cur1 = connection.cursor()
+    cur1.execute(
         """SELECT 
             c.fips_code,
             c.name, 
@@ -169,9 +189,8 @@ def county_page(
         (userId, fips_code),
     )
 
-    results_1: list = cur.fetchall()[0]  # type: ignore (trust me bro)
-
-    cur.execute(
+    cur2 = connection.cursor()
+    cur2.execute(
         """
 SELECT 
     COUNT(DISTINCT CASE 
@@ -189,9 +208,36 @@ WHERE
         (fips_code,),
     )
 
-    results_2: list[int] = cur.fetchall()[0]  # type: ignore (trust me bro)
+    cur3 = connection.cursor()
+    cur3.execute(
+        """
+SELECT 
+    e.year_num AS "election year",
+    100.0 * cr.D_votes / (cr.D_votes + cr.R_votes) AS "county D",
+    100.0 * cr.R_votes / (cr.D_votes + cr.R_votes) AS "county R",
+    cr.winner AS "county winner",
+    100.0 * e.D_votes / (e.D_votes + e.R_votes) AS "national D",
+    100.0 * e.R_votes / (e.D_votes + e.R_votes) AS "national R",
+    e.winner AS "national winner",
+    cr.winner = e.winner as "match?"
+FROM 
+    Election e
+JOIN 
+    County_Result cr ON e.year_num = cr.election
+WHERE 
+    cr.county = %s
+ORDER BY e.year_num DESC;
+        """,
+        (fips_code,),
+    )
 
-    cur.close()
+    results_1: list = cur1.fetchall()[0]  # type: ignore (trust me bro)
+    results_2: list[int] = cur2.fetchall()[0]  # type: ignore (trust me bro)
+    results_3: list[list] = cur3.fetchall()  # type: ignore (trust me bro)
+
+    cur1.close()
+    cur2.close()
+    cur3.close()
 
     county = County(
         fips=results_1[0],
@@ -200,6 +246,7 @@ WHERE
         favorited=results_1[3],
         matching_elections=results_2[0],
         total_elections=results_2[1],
+        results=results_3,
     )
 
     return HTMLResponse(template.render(county=county))

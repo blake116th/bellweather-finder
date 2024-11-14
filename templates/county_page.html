@@ -5,18 +5,54 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Bellweather Finder - {{county.name}}</title>
         <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+        <link rel="stylesheet" href="/tailwind.css">
     </head>
     <body>
-        <header>
-            <h1>{{county.name}}, {{county.state}} - Bellweather Status</h1>
-            <h4>FIPS: {{county.fips}}</h4>
+        <header class="p-5">
+            <a href="/"><< back</a>
         </header>
-        <main>
-            <button hx-put="/county/{{county.fips}}/favorite" hx-swap="outerHTML">
-                {{'Favorited!' if county.favorited else 'Not favorited'}}
-            </button>
-
+        <main class="max-w-5xl p-5 mx-auto">
+            <div class="flex">
+              <h1 class="text-center">{{county.name}}, {{county.state}} - Bellweather Status</h1>
+              <div class="flex-1"></div>
+              <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full" hx-put="/county/{{county.fips}}/favorite" hx-swap="innerHTML">
+                {{'Highlighted' if county.favorited else 'Not Highlighted'}}
+              </button>
+            </div>
+            <h4>FIPS: {{county.fips}}</h4>
+            <br><br>
             This county has predicted <b>{{county.matching_elections}} / {{county.total_elections}}</b> elections since 2000,
+            <br><br>
+
+<table>
+    <thead>
+        <tr>
+            <th>Year</th>
+            <th>County % D</th>
+            <th>County % R</th>
+            <th>County Winner</th>
+            <th>Nation % D</th>
+            <th>Nation % R</th>
+            <th>National Winner</th>
+            <th>Match?</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for result in county.results %}
+          <tr>
+              <td>{{ result[0] }}</td>
+              <td>{{ result[1]|round(1) }}</td>
+              <td>{{ result[2]|round(1) }}</td>
+              <td>{{ result[3] }}</td>
+              <td>{{ result[4]|round(1) }}</td>
+              <td>{{ result[5]|round(1)  }}</td>
+              <td>{{ result[6] }}</td>
+              <td>{{ '✅' if result[7] else '❌' }}</td>
+          </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
         </main>
         <footer>
         </footer>
